@@ -114,7 +114,12 @@ export const decodeOverlayOnDisk = async (
   let overlayMask: OverlayMask;
 
   try {
-    overlayMask = await decodeWithCanvas(overlayImageBlob);
+    overlayMask = await decodeWithCanvas(
+      overlayImageBlob,
+      cls,
+      field,
+      coloring
+    );
   } catch (e) {
     console.error(e);
     return;
