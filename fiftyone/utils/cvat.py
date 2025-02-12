@@ -4306,19 +4306,36 @@ class CVATAnnotationAPI(foua.AnnotationAPI):
 
         if frame_step is not None:
             data["frame_filter"] = "step=%d" % frame_step
-
-        files, open_files = self._parse_local_files(paths)
-
-        if self._server_version >= Version("2.4.6"):
+        
+        # modify from https://github.com/voxel51/fiftyone/issues/1235#issuecomment-1242681858
+        cvat_root_dir = os.environ.get("FIFTYONE_CVAT_SHARE_ROOT_DIR", None)
+        cvat_relpath_dir = os.environ.get("FIFTYONE_CVAT_RELPATH", "/datasets/")
+        if isinstance(cvat_root_dir, str):
+            server_file_names = []
+            for idx, path in enumerate(reversed(paths)):
+                server_file_names.append(os.path.join(cvat_root_dir, os.path.relpath(path, cvat_relpath_dir)))
+            data["server_files"] = server_file_names
+            data["storage_method"] = "cache"
+            data["storage"] = "share"
             data["sorting_method"] = "predefined"
+            try:
+                self.post(self.task_data_url(task_id), data=data)
+            except Exception as e:
+                raise e 
 
-        try:
-            self.post(self.task_data_url(task_id), data=data, files=files)
-        except Exception as e:
-            raise e
-        finally:
-            for f in open_files:
-                f.close()
+        else:
+            files, open_files = self._parse_local_files(paths)
+            
+            if self._server_version >= Version("2.4.6"):
+                data["sorting_method"] = "predefined"
+
+            try:
+                self.post(self.task_data_url(task_id), data=data, files=files)
+            except Exception as e:
+                raise e
+            finally:
+                for f in open_files:
+                    f.close()
 
         # It can take a bit for jobs to show up, so we poll
         job_ids = []
