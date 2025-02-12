@@ -4311,15 +4311,16 @@ class CVATAnnotationAPI(foua.AnnotationAPI):
         cvat_root_dir = os.environ.get("FIFTYONE_CVAT_SHARE_ROOT_DIR", None)
         cvat_relpath_dir = os.environ.get("FIFTYONE_CVAT_RELPATH", "/datasets/")
         if isinstance(cvat_root_dir, str):
+            print(f"Try to use the share location for CVAT ... ROOT_DIR: {cvat_root_dir}")
             server_file_names = []
-            for idx, path in enumerate(reversed(paths)):
+            for idx, path in enumerate(paths):
                 server_file_names.append(os.path.join(cvat_root_dir, os.path.relpath(path, cvat_relpath_dir)))
             data["server_files"] = server_file_names
-            data["storage_method"] = "cache"
+            data["storage_method"] = "file_system"
             data["storage"] = "share"
             data["sorting_method"] = "predefined"
             try:
-                self.post(self.task_data_url(task_id), data=data)
+                self.post(self.task_data_url(task_id), json=data)
             except Exception as e:
                 raise e 
 
