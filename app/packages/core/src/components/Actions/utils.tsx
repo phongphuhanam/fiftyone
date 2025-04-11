@@ -61,6 +61,19 @@ export const useHighlightHover = (
   };
 };
 
+/**
+ * Returns true if filters should be omitted from tag parameters
+ *
+ * @param modal is modal context
+ * @param selectedSamples selected samples set
+ */
+export const overrideFilters = (
+  modal: boolean,
+  selectedSamples: Set<string>
+) => {
+  return modal && !!selectedSamples.size;
+};
+
 export const tagStatistics = selectorFamily<
   {
     count: number;
@@ -132,7 +145,20 @@ export const tagStats = selectorFamily<
   get:
     ({ modal, labels }) =>
     ({ get }) => {
-      return get(tagStatistics({ modal, labels })).tags;
+      const data = modal
+        ? []
+        : Object.keys(
+            get(
+              labels
+                ? fos.labelTagCounts({ modal: false, extended: false })
+                : fos.sampleTagCounts({ modal: false, extended: false })
+            )
+          ).map((t) => [t, 0]);
+
+      return {
+        ...Object.fromEntries(data),
+        ...get(tagStatistics({ modal, labels })).tags,
+      };
     },
 });
 
@@ -190,6 +216,9 @@ export const tagParameters = ({
 
   return {
     ...params,
+    filters: overrideFilters(params.modal, selectedSamples)
+      ? {}
+      : params.filters,
     label_fields: activeFields,
     target_labels: targetLabels,
     slices: groupData?.slices,
