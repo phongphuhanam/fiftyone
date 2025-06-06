@@ -3813,6 +3813,14 @@ class CVATAnnotationAPI(foua.AnnotationAPI):
 
         logger.debug("CVAT server version: %s", self._server_version)
 
+        if self._server_version > Version("2.30"):
+            raise RuntimeError(
+                f"CVAT server version '{self._server_version}' is not "
+                "currently supported. Please use CVAT <= 2.30.\n\n"
+                "See https://github.com/voxel51/fiftyone/issues/5771 for "
+                "details."
+            )
+
     def _add_referer(self):
         if "Referer" not in self._session.headers:
             self._session.headers["Referer"] = self.login_url
@@ -4306,7 +4314,7 @@ class CVATAnnotationAPI(foua.AnnotationAPI):
 
         if frame_step is not None:
             data["frame_filter"] = "step=%d" % frame_step
-
+        
         # modify from https://github.com/voxel51/fiftyone/issues/1235#issuecomment-1242681858
         cvat_root_dir = os.environ.get("FIFTYONE_CVAT_SHARE_ROOT_DIR", None)
         cvat_relpath_dir = os.environ.get(
@@ -4333,6 +4341,7 @@ class CVATAnnotationAPI(foua.AnnotationAPI):
                 raise e
 
         else:
+            
             files, open_files = self._parse_local_files(paths)
 
             if self._server_version >= Version("2.4.6"):
