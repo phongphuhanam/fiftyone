@@ -3671,6 +3671,9 @@ class CVATAnnotationAPI(foua.AnnotationAPI):
         return "%s/%d" % (self.tasks_url, task_id)
 
     def task_status_url(self, task_id):
+        logger.warning(
+            "task_status_url is deprecated and will be removed in a future version"
+        )
         return "%s/status" % self.task_url(task_id)
 
     def task_data_url(self, task_id):
@@ -3812,14 +3815,6 @@ class CVATAnnotationAPI(foua.AnnotationAPI):
             )
 
         logger.debug("CVAT server version: %s", self._server_version)
-
-        if self._server_version > Version("2.30"):
-            raise RuntimeError(
-                f"CVAT server version '{self._server_version}' is not "
-                "currently supported. Please use CVAT <= 2.30.\n\n"
-                "See https://github.com/voxel51/fiftyone/issues/5771 for "
-                "details."
-            )
 
     def _add_referer(self):
         if "Referer" not in self._session.headers:
@@ -4213,9 +4208,7 @@ class CVATAnnotationAPI(foua.AnnotationAPI):
             True/False
         """
         try:
-            response = self.get(
-                self.task_status_url(task_id), print_error_info=False
-            )
+            response = self.get(self.task_url(task_id), print_error_info=False)
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
                 return False
@@ -4314,12 +4307,9 @@ class CVATAnnotationAPI(foua.AnnotationAPI):
 
         if frame_step is not None:
             data["frame_filter"] = "step=%d" % frame_step
-        
-        # modify from https://github.com/voxel51/fiftyone/issues/1235#issuecomment-1242681858
+
         cvat_root_dir = os.environ.get("FIFTYONE_CVAT_SHARE_ROOT_DIR", None)
-        cvat_relpath_dir = os.environ.get(
-            "FIFTYONE_CVAT_RELPATH", "/datasets/"
-        )
+        cvat_relpath_dir = os.environ.get("FIFTYONE_CVAT_RELPATH", "/datasets/")
         if isinstance(cvat_root_dir, str):
             print(
                 f"Try to use the share location for CVAT ... ROOT_DIR: {cvat_root_dir}"
@@ -4327,9 +4317,7 @@ class CVATAnnotationAPI(foua.AnnotationAPI):
             server_file_names = []
             for idx, path in enumerate(paths):
                 server_file_names.append(
-                    os.path.join(
-                        cvat_root_dir, os.path.relpath(path, cvat_relpath_dir)
-                    )
+                    os.path.join(cvat_root_dir, os.path.relpath(path, cvat_relpath_dir))
                 )
             data["server_files"] = server_file_names
             data["storage_method"] = "file_system"
@@ -4341,7 +4329,6 @@ class CVATAnnotationAPI(foua.AnnotationAPI):
                 raise e
 
         else:
-            
             files, open_files = self._parse_local_files(paths)
 
             if self._server_version >= Version("2.4.6"):
@@ -4354,7 +4341,7 @@ class CVATAnnotationAPI(foua.AnnotationAPI):
             finally:
                 for f in open_files:
                     f.close()
-
+ 
         # It can take a bit for jobs to show up, so we poll
         job_ids = []
         while not job_ids:
@@ -4390,22 +4377,24 @@ class CVATAnnotationAPI(foua.AnnotationAPI):
         files = {}
         open_files = []
 
+        filename_maker = fou.UniqueFilenameMaker()
+
         if len(paths) == 1 and fom.get_media_type(paths[0]) == fom.VIDEO:
             # Video task
-            filename = os.path.basename(paths[0])
+            filename = filename_maker.get_output_path(paths[0])
             f = open(paths[0], "rb")
             files["client_files[0]"] = (filename, f)
             open_files.append(f)
         else:
             # Image task
             for idx, path in enumerate(paths):
-                filename = os.path.basename(path)
+                filename = filename_maker.get_output_path(path)
                 if self._server_version < Version("2.4.6"):
                     # IMPORTANT: older versions of CVAT organizes media within
                     # a task alphabetically by filename, so we must give CVAT
                     # filenames whose alphabetical order matches the order of
                     # `paths`
-                    filename = "%06d_%s" % (idx, os.path.basename(path))
+                    filename = "%06d_%s" % (idx, filename)
 
                 if self._server_version >= Version("2.3"):
                     with open(path, "rb") as f:
@@ -5419,8 +5408,8 @@ class CVATAnnotationAPI(foua.AnnotationAPI):
                     "task, but this requires loading all images "
                     "simultaneously into RAM, which will take at least %s. "
                     "Consider specifying a `task_size` to break the data into "
-                    "smaller chunks, or upgrade to FiftyOne Teams so that you "
-                    "can provide a cloud manifest",
+                    "smaller chunks, or upgrade to FiftyOne Enterprise so "
+                    "that you can provide a cloud manifest",
                     etau.to_human_bytes_str(required_bytes),
                 )
 
